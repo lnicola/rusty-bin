@@ -1,0 +1,16 @@
+[package]
+authors = ["Laurentiu Nicola <lnicola@dend.ro>"]
+name = "rusty-bin"
+version = "0.1.0"
+
+[dependencies]
+diesel = "0.12.0"
+diesel_codegen = "0.12.0"
+dotenv = "0.10.0"
+handlebars = "0.26.2"
+libsqlite3-sys = "0.8.0"
+r2d2 = "0.7.2"
+r2d2-diesel = "0.12.0"
+rocket = "0.2.6"
+rocket_codegen = "0.2.6"
+rocket_contrib = "0.2.6"
