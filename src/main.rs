@@ -3,13 +3,17 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate diesel_codegen;
 extern crate r2d2;
 extern crate r2d2_diesel;
 extern crate dotenv;
 extern crate rocket;
 extern crate rocket_contrib;
+
+mod db;
+
+use std::env;
+
+use db::Conn;
 
 #[get("/")]
 fn hello() -> String {
@@ -17,8 +21,10 @@ fn hello() -> String {
 }
 
 fn main() {
+    dotenv::dotenv().ok();
+
     rocket::ignite()
-        .mount("/",
-               routes![hello])
+        .manage(db::init_pool(&env::var("DATABASE_URL").expect("DATABASE_URL must be set")))
+        .mount("/", routes![hello])
         .launch();
 }
