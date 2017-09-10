@@ -6,7 +6,7 @@ use r2d2_diesel::ConnectionManager;
 
 use rocket::http::Status;
 use rocket::request::{self, FromRequest};
-use rocket::{Request, State, Outcome};
+use rocket::{Outcome, Request, State};
 
 pub mod schema;
 
@@ -19,12 +19,6 @@ pub fn init_pool(database_url: &str) -> Pool {
 }
 
 pub struct Conn(r2d2::PooledConnection<ConnectionManager<SqliteConnection>>);
-
-impl Conn {
-    pub fn new(inner: r2d2::PooledConnection<ConnectionManager<SqliteConnection>>) -> Self {
-        Conn(inner)
-    }
-}
 
 impl Deref for Conn {
     type Target = SqliteConnection;

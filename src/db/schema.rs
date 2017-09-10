@@ -8,9 +8,11 @@ table! {
 table! {
     post (post_id) {
         post_id -> Binary,
-        user_id -> Integer,
+        user_id -> Nullable<Integer>,
         created_date -> Timestamp,
-        expres_date -> Nullable<Timestamp>,
-        content -> Binary,
+        expires_date -> Nullable<Timestamp>,
+        language -> Text,
+        contents -> Binary,
+        deletion_token -> Binary,
     }
 }

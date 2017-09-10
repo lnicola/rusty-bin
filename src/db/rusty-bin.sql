@@ -8,5 +8,7 @@ CREATE TABLE post(
     user_id INT REFERENCES user(user_id),
     created_date BIGINT NOT NULL,
     expires_date BIGINT,
-    content BLOB NOT NULL
+    language TEXT NOT NULL,
+    contents BLOB NOT NULL,
+    deletion_token BLOB NOT NULL
 ) WITHOUT ROWID;
