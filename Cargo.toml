@@ -5,13 +5,13 @@ version = "0.1.0"
 
 [dependencies]
 chrono = "0.4"
-diesel = { version = "0.15", features = ["sqlite", "uuid", "chrono"] }
-diesel_codegen = { version = "0.15", features = ["sqlite"] }
+diesel = { version = "0.16", features = ["sqlite", "uuid", "chrono"] }
+diesel_codegen = { version = "0.16", features = ["sqlite"] }
 dotenv = "0.10"
 lazy_static = "0.2"
 libsqlite3-sys = { version = "0.8", features = ["bundled"] }
 r2d2 = "0.7"
-r2d2-diesel = "0.15"
+r2d2-diesel = "0.16"
 rocket = "0.3"
 rocket_codegen = "0.3"
 serde = "1.0"
