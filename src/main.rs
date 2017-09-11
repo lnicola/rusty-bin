@@ -104,22 +104,31 @@ mod routes {
 
     #[get("/login")]
     fn login_page() -> Template {
-        // let ctx = HomeContext {};
         Template::render("login", &())
     }
 
     mod highlighting {
-        use syntect::parsing::{SyntaxDefinition, SyntaxSet};
-        use syntect::highlighting::{self, Theme, ThemeSet};
+        use syntect::parsing::SyntaxSet;
+        use syntect::highlighting::{self, ThemeSet};
         use syntect::html::{styles_to_coloured_html, IncludeBackground};
         use syntect::easy::HighlightLines;
 
         pub fn highlighted(s: &str, syntax: &str, theme: &str) -> (String, Vec<String>) {
             SYNTAX_SET.with(|ss| {
                 let theme = &THEME_SET.themes[theme];
-                let sd = ss.find_syntax_by_name(syntax).unwrap();
+                let sd = ss.find_syntax_by_name(syntax).unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
 
-                highlighted_impl(s, sd, theme)
+                let mut highlighter = HighlightLines::new(sd, theme);
+                let c = theme.settings.background.unwrap_or(highlighting::WHITE);
+                let wrapper_style = format!("background-color:#{:02x}{:02x}{:02x}", c.r, c.g, c.b);
+
+                let mut lines = Vec::new();
+                for line in s.lines() {
+                    let regions = highlighter.highlight(line);
+                    let html = styles_to_coloured_html(&regions[..], IncludeBackground::IfDifferent(c));
+                    lines.push(html);
+                }
+                (wrapper_style, lines)
             })
         }
 
@@ -127,45 +136,6 @@ mod routes {
             SYNTAX_SET.with(|ss| {
                 ss.syntaxes().iter().map(|syn| syn.name.clone()).collect()
             })
-        }
-
-        fn highlighted_impl(
-            s: &str,
-            syntax: &SyntaxDefinition,
-            theme: &Theme,
-        ) -> (String, Vec<String>) {
-            use std::fmt::Write;
-
-            let mut output = String::new();
-            let mut highlighter = HighlightLines::new(syntax, theme);
-            let c = theme.settings.background.unwrap_or(highlighting::WHITE);
-            let wrapper_style = format!("background-color:#{:02x}{:02x}{:02x}", c.r, c.g, c.b);
-            write!(
-                output,
-                "<pre class=\"contents\" style=\"background-color:#{:02x}{:02x}{:02x};\">\n",
-                c.r,
-                c.g,
-                c.b
-            ).unwrap();
-
-            let mut lines = Vec::new();
-            let mut line_number = 1;
-            for line in s.lines() {
-                let regions = highlighter.highlight(line);
-                let html = styles_to_coloured_html(&regions[..], IncludeBackground::IfDifferent(c));
-                write!(
-                    output,
-                    "<a id=\"L{}\" href=\"#L{}\" class=\"line\"></a>{}",
-                    line_number,
-                    line_number,
-                    html
-                ).unwrap();
-                output.push('\n');
-                lines.push(html);
-                line_number += 1;
-            }
-            output.push_str("</pre>\n");
-            (wrapper_style, lines)
         }
 
         thread_local! {
