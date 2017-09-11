@@ -10,5 +10,6 @@ CREATE TABLE post(
     expires_date BIGINT,
     language TEXT NOT NULL,
     contents BLOB NOT NULL,
+    contents TEXT NOT NULL,
     deletion_token BLOB NOT NULL
 ) WITHOUT ROWID;

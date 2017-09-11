@@ -19,7 +19,6 @@
 
 .line {
     counter-increment: line;
-    /* content: counter(line); */
     display: inline-block;
     min-width: 2rem;
     border-right: 1px solid #ddd;
@@ -27,6 +26,10 @@
     margin-right: .5em;
     color: #888;
     text-decoration: none;
+}
+
+.line::before {
+    content: counter(line);
 }
 
 button {

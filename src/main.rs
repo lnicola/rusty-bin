@@ -38,6 +38,7 @@ mod models {
         pub expires_date: Option<NaiveDateTime>,
         pub language: String,
         pub contents: Vec<u8>,
+        pub rendered: String,
         pub deletion_token: Vec<u8>,
     }
 }
@@ -84,8 +85,7 @@ mod routes {
     struct PasteContext {
         pub created_date: String,
         pub expires_date: Option<String>,
-        pub wrapper_style: String,
-        pub lines: Vec<String>,
+        pub contents: String,
     }
 
     #[derive(FromForm)]
@@ -113,22 +113,39 @@ mod routes {
         use syntect::html::{styles_to_coloured_html, IncludeBackground};
         use syntect::easy::HighlightLines;
 
-        pub fn highlighted(s: &str, syntax: &str, theme: &str) -> (String, Vec<String>) {
+        pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
             SYNTAX_SET.with(|ss| {
+                use std::fmt::Write;
+
                 let theme = &THEME_SET.themes[theme];
-                let sd = ss.find_syntax_by_name(syntax).unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
+                let sd = ss.find_syntax_by_name(syntax)
+                    .unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
 
                 let mut highlighter = HighlightLines::new(sd, theme);
                 let c = theme.settings.background.unwrap_or(highlighting::WHITE);
-                let wrapper_style = format!("background-color:#{:02x}{:02x}{:02x}", c.r, c.g, c.b);
-
-                let mut lines = Vec::new();
+                let mut output = format!(
+                    r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
+                    c.r,
+                    c.g,
+                    c.b
+                );
+                let mut line_number = 1;
                 for line in s.lines() {
                     let regions = highlighter.highlight(line);
-                    let html = styles_to_coloured_html(&regions[..], IncludeBackground::IfDifferent(c));
-                    lines.push(html);
+                    let html =
+                        styles_to_coloured_html(&regions[..], IncludeBackground::IfDifferent(c));
+                    write!(
+                        output,
+                        r##"<a id="L{}" href="#L{}" class="line"></a>"##,
+                        line_number,
+                        line_number
+                    ).unwrap();
+                    output.push_str(&html);
+                    output.push_str("\n");
+                    line_number += 1;
                 }
-                (wrapper_style, lines)
+                output.push_str("</pre>");
+                output
             })
         }
 
@@ -156,19 +173,13 @@ mod routes {
         let post_id = Uuid::parse_str(&id).unwrap();
         let post = operations::get_paste(&post_id, &db).unwrap();
 
-        let contents = String::from_utf8(post.contents).unwrap();
-
-        use self::highlighting::highlighted;
-        let (wrapper_style, lines) = highlighted(&contents, &post.language, "base16-ocean.dark");
-
         let ctx = PasteContext {
             created_date: DateTime::<Local>::from_utc(post.created_date, *Local::now().offset())
                 .to_rfc2822(),
             expires_date: post.expires_date.map(|e| {
                 DateTime::<Local>::from_utc(e, *Local::now().offset()).to_rfc2822()
             }),
-            wrapper_style: wrapper_style,
-            lines: lines,
+            contents: post.rendered,
         };
         Template::render("paste", &ctx)
     }
@@ -177,6 +188,14 @@ mod routes {
     fn new_paste(paste_form: Form<UserPaste>, db: Conn) -> Redirect {
         let paste_form = paste_form.into_inner();
         let new_id = Uuid::new_v4();
+
+        use self::highlighting::highlighted;
+        let html = highlighted(
+            &paste_form.contents,
+            &paste_form.language,
+            "base16-ocean.dark",
+        );
+
         let new_post = Post {
             post_id: new_id.as_bytes().to_vec(),
             user_id: None,
@@ -184,6 +203,7 @@ mod routes {
             expires_date: None,
             language: paste_form.language,
             contents: paste_form.contents.into_bytes(),
+            rendered: html,
             deletion_token: Uuid::new_v4().as_bytes().to_vec(),
         };
         operations::insert_paste(&new_post, &db).unwrap();

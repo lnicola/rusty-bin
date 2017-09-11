@@ -12,12 +12,7 @@
     <p>Posted on: {{ created_date }}</p>
     <!--<p>Expires on: {{ expires_date }}</p>-->
     <div id="wrapper">
-        <div class="expand">
-            <pre class="contents" style="{{ wrapper_style }}">
-{% for line in lines %}<a id="L{{ loop.index }}" href="#L{{ loop.index }}" class="line">{{ loop.index }}</a>{{ line | safe }}
-{% endfor %}
-            </pre>
-        </div>
+        <div class="expand">{{ contents | safe }}</div>
     </div>
 </body>
 

@@ -13,6 +13,7 @@ table! {
         expires_date -> Nullable<Timestamp>,
         language -> Text,
         contents -> Binary,
+        rendered -> Text,
         deletion_token -> Binary,
     }
 }
