@@ -1,16 +1,12 @@
-#![feature(plugin, custom_derive, custom_attribute, conservative_impl_trait)]
+#![feature(plugin, custom_derive, custom_attribute)]
 #![plugin(rocket_codegen)]
 
 extern crate chrono;
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate diesel_codegen;
 extern crate dotenv;
 #[macro_use]
 extern crate lazy_static;
-extern crate r2d2;
-extern crate r2d2_diesel;
 extern crate rocket;
 extern crate rocket_contrib;
 #[macro_use]
@@ -20,15 +16,16 @@ extern crate uuid;
 
 mod db;
 
-use std::env;
 use rocket_contrib::Template;
+use std::env;
 
 mod models {
     use chrono::NaiveDateTime;
 
     use db::schema::*;
 
-    #[derive(Queryable, Insertable, PartialEq, Eq, Clone, Identifiable, Associations, AsChangeset)]
+    #[derive(Queryable, Insertable, PartialEq, Eq, Clone, Identifiable, Associations,
+             AsChangeset)]
     #[primary_key(post_id)]
     #[table_name = "post"]
     pub struct Post {
@@ -44,8 +41,8 @@ mod models {
 }
 
 mod operations {
-    use diesel::*;
     use diesel::result::QueryResult;
+    use diesel::*;
     use uuid::Uuid;
 
     use db::Conn;
@@ -53,7 +50,7 @@ mod operations {
     use models::Post;
 
     pub fn insert_paste(new_post: &Post, db: &Conn) -> QueryResult<()> {
-        insert(new_post).into(post).execute(&**db)?;
+        insert_into(post).values(new_post).execute(&**db)?;
         Ok(())
     }
 
@@ -66,10 +63,10 @@ mod operations {
 mod routes {
     use std::path::{Path, PathBuf};
 
+    use chrono::{DateTime, Local};
     use rocket::request::Form;
     use rocket::response::{NamedFile, Redirect};
     use rocket_contrib::Template;
-    use chrono::{DateTime, Local};
     use uuid::Uuid;
 
     use db::Conn;
@@ -108,10 +105,10 @@ mod routes {
     }
 
     mod highlighting {
-        use syntect::parsing::SyntaxSet;
-        use syntect::highlighting::{self, ThemeSet};
-        use syntect::html::{styles_to_coloured_html, IncludeBackground};
         use syntect::easy::HighlightLines;
+        use syntect::highlighting::{Color, ThemeSet};
+        use syntect::html::{styles_to_coloured_html, IncludeBackground};
+        use syntect::parsing::SyntaxSet;
 
         pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
             SYNTAX_SET.with(|ss| {
@@ -122,12 +119,10 @@ mod routes {
                     .unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
 
                 let mut highlighter = HighlightLines::new(sd, theme);
-                let c = theme.settings.background.unwrap_or(highlighting::WHITE);
+                let c = theme.settings.background.unwrap_or(Color::WHITE);
                 let mut output = format!(
                     r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
-                    c.r,
-                    c.g,
-                    c.b
+                    c.r, c.g, c.b
                 );
                 let mut line_number = 1;
                 for line in s.lines() {
@@ -137,8 +132,7 @@ mod routes {
                     write!(
                         output,
                         r##"<a id="L{}" href="#L{}" class="line"></a>"##,
-                        line_number,
-                        line_number
+                        line_number, line_number
                     ).unwrap();
                     output.push_str(&html);
                     output.push_str("\n");
@@ -150,9 +144,7 @@ mod routes {
         }
 
         pub fn get_syntaxes() -> Vec<String> {
-            SYNTAX_SET.with(|ss| {
-                ss.syntaxes().iter().map(|syn| syn.name.clone()).collect()
-            })
+            SYNTAX_SET.with(|ss| ss.syntaxes().iter().map(|syn| syn.name.clone()).collect())
         }
 
         thread_local! {
@@ -176,9 +168,8 @@ mod routes {
         let ctx = PasteContext {
             created_date: DateTime::<Local>::from_utc(post.created_date, *Local::now().offset())
                 .to_rfc2822(),
-            expires_date: post.expires_date.map(|e| {
-                DateTime::<Local>::from_utc(e, *Local::now().offset()).to_rfc2822()
-            }),
+            expires_date: post.expires_date
+                .map(|e| DateTime::<Local>::from_utc(e, *Local::now().offset()).to_rfc2822()),
             contents: post.rendered,
         };
         Template::render("paste", &ctx)
@@ -221,8 +212,10 @@ fn main() {
     dotenv::dotenv().ok();
 
     rocket::ignite()
-        .manage(db::init_pool(&env::var("RUSTY_BIN_DATABASE_URL")
-            .unwrap_or_else(|_| String::from("rusty-bin.db"))))
+        .manage(
+            db::init_pool(&env::var("RUSTY_BIN_DATABASE_URL")
+                .unwrap_or_else(|_| String::from("rusty-bin.db"))),
+        )
         .mount(
             "/",
             routes![
