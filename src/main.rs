@@ -140,7 +140,6 @@ mod routes {
                 )
                 .unwrap();
                 output.push_str(&html);
-                output.push_str("\n");
                 line_number += 1;
             }
             output.push_str("</pre>");
