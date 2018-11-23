@@ -113,53 +113,50 @@ mod routes {
         use syntect::util::LinesWithEndings;
 
         pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
-            SYNTAX_SET.with(|ss| {
-                use std::fmt::Write;
+            use std::fmt::Write;
 
-                let theme = &THEME_SET.themes[theme];
-                let sd = ss
-                    .find_syntax_by_name(syntax)
-                    .unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
+            let theme = &THEME_SET.themes[theme];
+            let sd = SYNTAX_SET
+                .find_syntax_by_name(syntax)
+                .unwrap_or_else(|| SYNTAX_SET.find_syntax_by_name("Plain Text").unwrap());
 
-                let mut highlighter = HighlightLines::new(sd, theme);
-                let c = theme.settings.background.unwrap_or(Color::WHITE);
-                let mut output = format!(
-                    r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
-                    c.r, c.g, c.b
+            let mut highlighter = HighlightLines::new(sd, theme);
+            let c = theme.settings.background.unwrap_or(Color::WHITE);
+            let mut output = format!(
+                r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
+                c.r, c.g, c.b
+            );
+            let mut line_number = 1;
+            for line in LinesWithEndings::from(s) {
+                let regions = highlighter.highlight(line, &SYNTAX_SET);
+                let html = styled_line_to_highlighted_html(
+                    &regions[..],
+                    IncludeBackground::IfDifferent(c),
                 );
-                let mut line_number = 1;
-                for line in LinesWithEndings::from(s) {
-                    let regions = highlighter.highlight(line, ss);
-                    let html = styled_line_to_highlighted_html(
-                        &regions[..],
-                        IncludeBackground::IfDifferent(c),
-                    );
-                    write!(
-                        output,
-                        r##"<a id="L{}" href="#L{}" class="line"></a>"##,
-                        line_number, line_number
-                    )
-                    .unwrap();
-                    output.push_str(&html);
-                    output.push_str("\n");
-                    line_number += 1;
-                }
-                output.push_str("</pre>");
-                output
-            })
+                write!(
+                    output,
+                    r##"<a id="L{}" href="#L{}" class="line"></a>"##,
+                    line_number, line_number
+                )
+                .unwrap();
+                output.push_str(&html);
+                output.push_str("\n");
+                line_number += 1;
+            }
+            output.push_str("</pre>");
+            output
         }
 
         pub fn get_syntaxes() -> Vec<String> {
-            SYNTAX_SET.with(|ss| ss.syntaxes().iter().map(|syn| syn.name.clone()).collect())
-        }
-
-        thread_local! {
-            static SYNTAX_SET: SyntaxSet = {
-                SyntaxSet::load_defaults_newlines()
-            }
+            SYNTAX_SET
+                .syntaxes()
+                .iter()
+                .map(|syn| syn.name.clone())
+                .collect()
         }
 
         lazy_static! {
+            static ref SYNTAX_SET: SyntaxSet = SyntaxSet::load_defaults_newlines();
             static ref THEME_SET: ThemeSet = ThemeSet::load_defaults();
         }
     }
