@@ -24,8 +24,9 @@ mod models {
 
     use db::schema::*;
 
-    #[derive(Queryable, Insertable, PartialEq, Eq, Clone, Identifiable, Associations,
-             AsChangeset)]
+    #[derive(
+        Queryable, Insertable, PartialEq, Eq, Clone, Identifiable, Associations, AsChangeset,
+    )]
     #[primary_key(post_id)]
     #[table_name = "post"]
     pub struct Post {
@@ -45,8 +46,8 @@ mod operations {
     use diesel::*;
     use uuid::Uuid;
 
-    use db::Conn;
     use db::schema::post::dsl::*;
+    use db::Conn;
     use models::Post;
 
     pub fn insert_paste(new_post: &Post, db: &Conn) -> QueryResult<()> {
@@ -107,7 +108,7 @@ mod routes {
     mod highlighting {
         use syntect::easy::HighlightLines;
         use syntect::highlighting::{Color, ThemeSet};
-        use syntect::html::{styles_to_coloured_html, IncludeBackground};
+        use syntect::html::{styled_line_to_highlighted_html, IncludeBackground};
         use syntect::parsing::SyntaxSet;
 
         pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
@@ -115,7 +116,8 @@ mod routes {
                 use std::fmt::Write;
 
                 let theme = &THEME_SET.themes[theme];
-                let sd = ss.find_syntax_by_name(syntax)
+                let sd = ss
+                    .find_syntax_by_name(syntax)
                     .unwrap_or_else(|| ss.find_syntax_by_name("Plain Text").unwrap());
 
                 let mut highlighter = HighlightLines::new(sd, theme);
@@ -126,14 +128,17 @@ mod routes {
                 );
                 let mut line_number = 1;
                 for line in s.lines() {
-                    let regions = highlighter.highlight(line);
-                    let html =
-                        styles_to_coloured_html(&regions[..], IncludeBackground::IfDifferent(c));
+                    let regions = highlighter.highlight(line, ss);
+                    let html = styled_line_to_highlighted_html(
+                        &regions[..],
+                        IncludeBackground::IfDifferent(c),
+                    );
                     write!(
                         output,
                         r##"<a id="L{}" href="#L{}" class="line"></a>"##,
                         line_number, line_number
-                    ).unwrap();
+                    )
+                    .unwrap();
                     output.push_str(&html);
                     output.push_str("\n");
                     line_number += 1;
@@ -149,9 +154,7 @@ mod routes {
 
         thread_local! {
             static SYNTAX_SET: SyntaxSet = {
-                let mut ss = SyntaxSet::load_defaults_nonewlines();
-                ss.link_syntaxes();
-                ss
+                SyntaxSet::load_defaults_nonewlines()
             }
         }
 
@@ -168,7 +171,8 @@ mod routes {
         let ctx = PasteContext {
             created_date: DateTime::<Local>::from_utc(post.created_date, *Local::now().offset())
                 .to_rfc2822(),
-            expires_date: post.expires_date
+            expires_date: post
+                .expires_date
                 .map(|e| DateTime::<Local>::from_utc(e, *Local::now().offset()).to_rfc2822()),
             contents: post.rendered,
         };
@@ -212,10 +216,9 @@ fn main() {
     dotenv::dotenv().ok();
 
     rocket::ignite()
-        .manage(
-            db::init_pool(&env::var("RUSTY_BIN_DATABASE_URL")
-                .unwrap_or_else(|_| String::from("rusty-bin.db"))),
-        )
+        .manage(db::init_pool(
+            &env::var("RUSTY_BIN_DATABASE_URL").unwrap_or_else(|_| String::from("rusty-bin.db")),
+        ))
         .mount(
             "/",
             routes![
