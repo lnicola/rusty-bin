@@ -110,6 +110,7 @@ mod routes {
         use syntect::highlighting::{Color, ThemeSet};
         use syntect::html::{styled_line_to_highlighted_html, IncludeBackground};
         use syntect::parsing::SyntaxSet;
+        use syntect::util::LinesWithEndings;
 
         pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
             SYNTAX_SET.with(|ss| {
@@ -127,7 +128,7 @@ mod routes {
                     c.r, c.g, c.b
                 );
                 let mut line_number = 1;
-                for line in s.lines() {
+                for line in LinesWithEndings::from(s) {
                     let regions = highlighter.highlight(line, ss);
                     let html = styled_line_to_highlighted_html(
                         &regions[..],
@@ -154,7 +155,7 @@ mod routes {
 
         thread_local! {
             static SYNTAX_SET: SyntaxSet = {
-                SyntaxSet::load_defaults_nonewlines()
+                SyntaxSet::load_defaults_newlines()
             }
         }
 
