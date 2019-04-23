@@ -7,7 +7,6 @@ version = "0.1.0"
 chrono = "0.4"
 diesel = { version = "1.4", default-features = false, features = ["r2d2", "sqlite", "uuid", "chrono"] }
 dotenv = "0.13"
-lazy_static = "1.3"
 rocket = { version = "0.4", git = "https://github.com/SergioBenitez/Rocket" }
 serde = "1.0"
 serde_derive = "1.0"

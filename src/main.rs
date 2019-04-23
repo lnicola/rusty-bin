@@ -5,8 +5,6 @@ extern crate chrono;
 extern crate diesel;
 extern crate dotenv;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
@@ -61,16 +59,82 @@ mod operations {
     }
 }
 
+pub mod highlighting {
+    use syntect::easy::HighlightLines;
+    use syntect::highlighting::{Color, ThemeSet};
+    use syntect::html::{styled_line_to_highlighted_html, IncludeBackground};
+    use syntect::parsing::SyntaxSet;
+    use syntect::util::LinesWithEndings;
+
+    pub struct Highlighter {
+        syntax_set: SyntaxSet,
+        theme_set: ThemeSet,
+    }
+
+    impl Highlighter {
+        pub fn new() -> Self {
+            Highlighter {
+                syntax_set: SyntaxSet::load_defaults_newlines(),
+                theme_set: ThemeSet::load_defaults(),
+            }
+        }
+
+        pub fn get_syntaxes(&self) -> Vec<String> {
+            self.syntax_set
+                .syntaxes()
+                .iter()
+                .map(|syn| syn.name.clone())
+                .collect()
+        }
+
+        pub fn highlighted(&self, s: &str, syntax: &str, theme: &str) -> String {
+            use std::fmt::Write;
+
+            let theme = &self.theme_set.themes[theme];
+            let sd = self
+                .syntax_set
+                .find_syntax_by_name(syntax)
+                .unwrap_or_else(|| self.syntax_set.find_syntax_by_name("Plain Text").unwrap());
+
+            let mut highlighter = HighlightLines::new(sd, theme);
+            let c = theme.settings.background.unwrap_or(Color::WHITE);
+            let mut output = format!(
+                r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
+                c.r, c.g, c.b
+            );
+            let mut line_number = 1;
+            for line in LinesWithEndings::from(s) {
+                let regions = highlighter.highlight(line, &self.syntax_set);
+                let html = styled_line_to_highlighted_html(
+                    &regions[..],
+                    IncludeBackground::IfDifferent(c),
+                );
+                write!(
+                    output,
+                    r##"<a id="L{}" href="#L{}" class="line"></a>"##,
+                    line_number, line_number
+                )
+                .unwrap();
+                output.push_str(&html);
+                line_number += 1;
+            }
+            output.push_str("</pre>");
+            output
+        }
+    }
+}
+
 mod routes {
     use std::path::{Path, PathBuf};
 
     use chrono::{DateTime, Local};
-    use rocket::request::Form;
+    use rocket::request::{Form, State};
     use rocket::response::{NamedFile, Redirect};
     use rocket_contrib::templates::Template;
     use uuid::Uuid;
 
     use db::Conn;
+    use highlighting;
     use models::Post;
     use operations;
 
@@ -93,9 +157,9 @@ mod routes {
     }
 
     #[get("/")]
-    pub fn index() -> Template {
+    pub fn index(highlighter: State<highlighting::Highlighter>) -> Template {
         let ctx = HomeContext {
-            syntaxes: highlighting::get_syntaxes(),
+            syntaxes: highlighter.get_syntaxes(),
         };
         Template::render("index", &ctx)
     }
@@ -103,61 +167,6 @@ mod routes {
     #[get("/login")]
     pub fn login_page() -> Template {
         Template::render("login", &())
-    }
-
-    mod highlighting {
-        use syntect::easy::HighlightLines;
-        use syntect::highlighting::{Color, ThemeSet};
-        use syntect::html::{styled_line_to_highlighted_html, IncludeBackground};
-        use syntect::parsing::SyntaxSet;
-        use syntect::util::LinesWithEndings;
-
-        pub fn highlighted(s: &str, syntax: &str, theme: &str) -> String {
-            use std::fmt::Write;
-
-            let theme = &THEME_SET.themes[theme];
-            let sd = SYNTAX_SET
-                .find_syntax_by_name(syntax)
-                .unwrap_or_else(|| SYNTAX_SET.find_syntax_by_name("Plain Text").unwrap());
-
-            let mut highlighter = HighlightLines::new(sd, theme);
-            let c = theme.settings.background.unwrap_or(Color::WHITE);
-            let mut output = format!(
-                r#"<pre class="contents" style="background-color:#{:02x}{:02x}{:02x}">"#,
-                c.r, c.g, c.b
-            );
-            let mut line_number = 1;
-            for line in LinesWithEndings::from(s) {
-                let regions = highlighter.highlight(line, &SYNTAX_SET);
-                let html = styled_line_to_highlighted_html(
-                    &regions[..],
-                    IncludeBackground::IfDifferent(c),
-                );
-                write!(
-                    output,
-                    r##"<a id="L{}" href="#L{}" class="line"></a>"##,
-                    line_number, line_number
-                )
-                .unwrap();
-                output.push_str(&html);
-                line_number += 1;
-            }
-            output.push_str("</pre>");
-            output
-        }
-
-        pub fn get_syntaxes() -> Vec<String> {
-            SYNTAX_SET
-                .syntaxes()
-                .iter()
-                .map(|syn| syn.name.clone())
-                .collect()
-        }
-
-        lazy_static! {
-            static ref SYNTAX_SET: SyntaxSet = SyntaxSet::load_defaults_newlines();
-            static ref THEME_SET: ThemeSet = ThemeSet::load_defaults();
-        }
     }
 
     #[get("/paste/<id>")]
@@ -177,12 +186,15 @@ mod routes {
     }
 
     #[post("/paste/new", data = "<paste_form>")]
-    pub fn new_paste(paste_form: Form<UserPaste>, db: Conn) -> Redirect {
+    pub fn new_paste(
+        paste_form: Form<UserPaste>,
+        db: Conn,
+        highlighter: State<highlighting::Highlighter>,
+    ) -> Redirect {
         let paste_form = paste_form.into_inner();
         let new_id = Uuid::new_v4();
 
-        use self::highlighting::highlighted;
-        let html = highlighted(
+        let html = highlighter.highlighted(
             &paste_form.contents,
             &paste_form.language,
             "base16-ocean.dark",
@@ -224,6 +236,7 @@ fn main() {
                 routes::new_paste
             ],
         )
+        .manage(highlighting::Highlighter::new())
         .mount("/static", routes![routes::files])
         .attach(Conn::fairing())
         .attach(Template::fairing())
