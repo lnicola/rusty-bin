@@ -1,5 +1,4 @@
-#![feature(plugin, custom_derive, custom_attribute)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
 extern crate chrono;
 #[macro_use]
@@ -7,6 +6,7 @@ extern crate diesel;
 extern crate dotenv;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
 extern crate rocket;
 extern crate rocket_contrib;
 #[macro_use]
@@ -16,7 +16,7 @@ extern crate uuid;
 
 mod db;
 
-use rocket_contrib::Template;
+use rocket_contrib::templates::Template;
 use std::env;
 
 mod models {
@@ -67,7 +67,7 @@ mod routes {
     use chrono::{DateTime, Local};
     use rocket::request::Form;
     use rocket::response::{NamedFile, Redirect};
-    use rocket_contrib::Template;
+    use rocket_contrib::templates::Template;
     use uuid::Uuid;
 
     use db::Conn;
@@ -87,13 +87,13 @@ mod routes {
     }
 
     #[derive(FromForm)]
-    struct UserPaste {
+    pub struct UserPaste {
         pub language: String,
         pub contents: String,
     }
 
     #[get("/")]
-    fn index() -> Template {
+    pub fn index() -> Template {
         let ctx = HomeContext {
             syntaxes: highlighting::get_syntaxes(),
         };
@@ -101,7 +101,7 @@ mod routes {
     }
 
     #[get("/login")]
-    fn login_page() -> Template {
+    pub fn login_page() -> Template {
         Template::render("login", &())
     }
 
@@ -161,7 +161,7 @@ mod routes {
     }
 
     #[get("/paste/<id>")]
-    fn load_paste(id: String, db: Conn) -> Template {
+    pub fn load_paste(id: String, db: Conn) -> Template {
         let post_id = Uuid::parse_str(&id).unwrap();
         let post = operations::get_paste(&post_id, &db).unwrap();
 
@@ -177,7 +177,7 @@ mod routes {
     }
 
     #[post("/paste/new", data = "<paste_form>")]
-    fn new_paste(paste_form: Form<UserPaste>, db: Conn) -> Redirect {
+    pub fn new_paste(paste_form: Form<UserPaste>, db: Conn) -> Redirect {
         let paste_form = paste_form.into_inner();
         let new_id = Uuid::new_v4();
 
@@ -200,11 +200,11 @@ mod routes {
         };
         operations::insert_paste(&new_post, &db).unwrap();
 
-        Redirect::to(&format!("/paste/{}", new_id))
+        Redirect::to(uri!(load_paste: id = new_id.to_string()))
     }
 
     #[get("/<file..>")]
-    fn files(file: PathBuf) -> Option<NamedFile> {
+    pub fn files(file: PathBuf) -> Option<NamedFile> {
         NamedFile::open(Path::new("static/").join(file)).ok()
     }
 }
