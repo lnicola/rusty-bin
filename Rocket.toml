@@ -1,0 +1,2 @@
+[global.databases]
+rusty_bin = { url = "rusty-bin.db" }

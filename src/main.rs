@@ -8,6 +8,7 @@ extern crate dotenv;
 extern crate lazy_static;
 #[macro_use]
 extern crate rocket;
+#[macro_use]
 extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
@@ -17,7 +18,6 @@ extern crate uuid;
 mod db;
 
 use rocket_contrib::templates::Template;
-use std::env;
 
 mod models {
     use chrono::NaiveDateTime;
@@ -209,13 +209,12 @@ mod routes {
     }
 }
 
+use db::Conn;
+
 fn main() {
     dotenv::dotenv().ok();
 
     rocket::ignite()
-        .manage(db::init_pool(
-            &env::var("RUSTY_BIN_DATABASE_URL").unwrap_or_else(|_| String::from("rusty-bin.db")),
-        ))
         .mount(
             "/",
             routes![
@@ -226,6 +225,7 @@ fn main() {
             ],
         )
         .mount("/static", routes![routes::files])
+        .attach(Conn::fairing())
         .attach(Template::fairing())
         .launch();
 }
